@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FlowPad: pseudocode to flowchart</title>
+<meta name="description" content="Write simple pseudocode, get a flowchart instantly. Free, saved in your browser, export PNG/SVG.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#E9EEF2;--ink:#14202B;--mute:#5B6B78;--red:#E5383B;--hi:#FFE45E;--card:#fff;--line:#C9D3DB}
+*{box-sizing:border-box;margin:0}
+body{font-family:"Bricolage Grotesque",system-ui,sans-serif;color:var(--ink);background:var(--paper);min-height:100vh;line-height:1.5;
+background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:28px 28px}
+main{max-width:1100px;margin:0 auto;padding:36px 16px 56px}
+h1{font-size:clamp(2rem,7vw,3.4rem);font-weight:800;line-height:1.05;letter-spacing:-.03em}
+h1 mark{background:var(--hi);padding:0 .12em}
+.sub{margin:10px 0 20px;color:var(--mute);max-width:52ch}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+button,select{font:inherit;font-weight:600;cursor:pointer;border:2px solid var(--ink);border-radius:10px;padding:9px 14px;background:var(--ink);color:#fff}
+button.alt,select{background:var(--card);color:var(--ink)}
+select{max-width:100%;font-weight:400}
+:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+.grid{display:grid;gap:16px}
+@media(min-width:900px){.grid{grid-template-columns:380px 1fr;align-items:start}}
+.box{background:var(--card);border:2px solid var(--ink);border-radius:14px;padding:14px;box-shadow:5px 5px 0 var(--ink)}
+textarea{width:100%;height:300px;resize:vertical;border:0;outline:0;font:15px/1.6 ui-monospace,Menlo,Consolas,monospace;color:var(--ink);tab-size:2}
+.hint{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);color:var(--mute);font-size:.85rem}
+.hint b{color:var(--red)}
+#chart{overflow:auto;max-height:78vh;text-align:center}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 16px;border-radius:10px;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.on{opacity:1}
+dialog{border:2px solid var(--ink);border-radius:14px;padding:20px;max-width:420px;width:92%;font-family:inherit;color:var(--ink)}
+dialog::backdrop{background:rgba(20,32,43,.5)}
+dialog h2{margin-bottom:10px}
+dialog td{padding:3px 12px 3px 0}
+kbd{background:var(--hi);border:1px solid var(--ink);border-radius:4px;padding:0 5px;font:600 .85rem ui-monospace,monospace}
+[hidden]{display:none!important}
+.tabs{display:flex;gap:6px;margin-bottom:10px}
+.tab{background:var(--card);color:var(--ink);padding:6px 12px}
+.tab.on{background:var(--hi)}
+pre{white-space:pre-wrap;text-align:left;font:15px/1.7 ui-monospace,Menlo,Consolas,monospace;max-height:78vh;overflow:auto}
+@media(prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+<main>
+<h1>Write pseudocode. <mark>See the flowchart.</mark></h1>
+<p class="sub">Type simple steps on the left and the flowchart draws itself. Everything is saved in your browser.</p>
+<div class="bar">
+<select id="docs" aria-label="Saved charts"></select>
+<select id="kind" aria-label="Type of new chart"><option value="pseudo">Pseudocode</option><option value="algo">Algorithm</option><option value="flow">Flowchart</option></select>
+<button id="new">New</button>
+<button id="del" class="alt">Delete</button>
+<select id="ex" aria-label="Examples"><option value="">Load an example...</option></select>
+<select id="conv" aria-label="Convert this chart"><option value="">Convert to...</option><option value="pseudo">Pseudocode</option><option value="algo">Algorithm</option><option value="flow">Flowchart</option></select>
+</div>
+<div class="grid">
+<section class="box">
+<textarea id="ed" spellcheck="false" autocapitalize="none" aria-label="Pseudocode"></textarea>
+<p class="hint" id="hint"></p>
+</section>
+<section class="box">
+<div class="bar">
+<button id="zo" class="alt" aria-label="Zoom out">−</button>
+<button id="zi" class="alt" aria-label="Zoom in">+</button>
+<button id="png">PNG</button>
+<button id="svg" class="alt">SVG</button>
+<button id="txt" class="alt">TXT</button>
+<button id="help" class="alt" aria-label="Keyboard shortcuts">?</button>
+</div>
+<div class="tabs"><button class="tab on" data-t="chart">Flowchart</button><button class="tab" data-t="pseudo">Pseudocode</button><button class="tab" data-t="algo">Algorithm</button></div>
+<div id="chart" aria-live="polite"></div>
+<pre id="txtv" hidden></pre>
+</section>
+</div>
+</main>
+<div id="toast" role="status"></div>
+<dialog id="dlg">
+<h2>Keyboard shortcuts</h2>
+<table>
+<tr><td><kbd>Ctrl/⌘ S</kbd></td><td>Save now</td></tr>
+<tr><td><kbd>Alt N</kbd></td><td>New chart</td></tr>
+<tr><td><kbd>Alt P</kbd></td><td>Export PNG</td></tr>
+<tr><td><kbd>Alt V</kbd></td><td>Export SVG</td></tr>
+<tr><td><kbd>Alt T</kbd></td><td>Export TXT</td></tr>
+<tr><td><kbd>Alt +</kbd> <kbd>Alt −</kbd></td><td>Zoom</td></tr>
+<tr><td><kbd>Alt /</kbd></td><td>This help</td></tr>
+<tr><td><kbd>Tab</kbd></td><td>Indent in editor</td></tr>
+</table>
+<div class="bar" style="margin:14px 0 0"><button id="close">Close</button></div>
+</dialog>
+
+<script>
+const $ = s => document.querySelector(s);
+const ed = $("#ed");
+const EX = {
+"1. App with Sonnet 5.5": "Write idea: who it is for, what problem\nAsk Sonnet 5.5 to interview you\nAnswer and ask for a one-page plan\nwhile plan has gaps or unclear parts\n  Ask Sonnet to find gaps and risks\n  Update the plan\nendwhile\nAsk for build order, smallest version first\nfor each step in the build order\n  Ask Sonnet for code for this step only\n  Run and test it on your phone\n  if it works then\n    Commit to git\n  else\n    Paste exact error, ask for the fix\n  endif\nendfor\nShip v1 and collect feedback",
+"2. Advanced tools with Sonnet 5.5": "Define the tool in one sentence\nAsk Sonnet to list features, must-have first\nCut the list down to a tiny v1\nAsk Sonnet for architecture and file layout\nif the architecture feels too complex then\n  Ask Sonnet for a simpler design\nendif\nWrite a short spec: goals, files, rules\nfor each feature in v1\n  Ask Sonnet for tests or a checklist first\n  Build the feature in a small prompt\n  Run it and check against the checklist\n  while it fails the checklist\n    Paste failing output, ask for a fix\n  endwhile\n  Commit to git\nendfor\nAsk Sonnet to review the whole code for bugs\nFix issues, then deploy and test with users",
+"Largest of 3": "input a\ninput b\ninput c\nlargest <- a\nif b > largest then\n  largest <- b\nendif\nif c > largest then\n  largest <- c\nendif\noutput largest",
+"Even or odd": "input n\nif n mod 2 = 0 then\n  output \"Even\"\nelse\n  output \"Odd\"\nendif",
+"Sum 1 to N": "input n\ntotal <- 0\nfor i <- 1 to n\n  total <- total + i\nendfor\noutput total",
+"Factorial": "input n\nf <- 1\nwhile n > 1\n  f <- f * n\n  n <- n - 1\nendwhile\noutput f",
+"Prime check": "input n\nprime <- true\ni <- 2\nwhile i * i <= n\n  if n mod i = 0 then\n    prime <- false\n  endif\n  i <- i + 1\nendwhile\nif prime then\n  output \"Prime\"\nelse\n  output \"Not prime\"\nendif"
+};
+
+const KN = { pseudo: "pseudocode", algo: "algorithm", flow: "flowchart" };
+const EXK = { "1. App with Sonnet 5.5": "flow", "2. Advanced tools with Sonnet 5.5": "flow" };
+const HINT = {
+  pseudo: "Pseudocode: input x, output x, x <- 5, if ... then / else / endif, while ... / endwhile, for ... / endfor.",
+  algo: "Algorithm: numbered plain steps. Read x, Print x, Set x to 5, If ... then, Otherwise, End if, While ... do, End while.",
+  flow: "Flowchart: one box per line. Decisions use if ... then / else / endif, loops use while or for ... endwhile / endfor. Start and End are added for you."
+};
+// ---------- storage ----------
+let S; try { S = JSON.parse(localStorage.getItem("flowpad.v1")); } catch (e) {}
+if (!S || !S.docs || !S.docs.length) S = { cur: 0, docs: ["1. App with Sonnet 5.5", "2. Advanced tools with Sonnet 5.5"].map(n => ({ name: n, kind: "flow", text: EX[n] })) };
+let zoom = 1, timer;
+const save = () => { try { localStorage.setItem("flowpad.v1", JSON.stringify(S)); } catch (e) {} };
+const toast = m => { const t = $("#toast"); t.textContent = m; t.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("on"), 1400); };
+EX["Even or odd (algorithm)"] = ser(parse(EX["Even or odd"]), "algo"); EXK["Even or odd (algorithm)"] = "algo";
+Object.keys(EX).forEach(k => { const o = document.createElement("option"); o.value = o.textContent = k; $("#ex").appendChild(o); });
+
+function refresh() {
+  $("#docs").innerHTML = "";
+  S.docs.forEach((d, i) => { const o = document.createElement("option"); o.value = i; o.textContent = d.name + " (" + KN[d.kind || "pseudo"] + ")"; $("#docs").appendChild(o); });
+  $("#docs").value = S.cur; ed.value = S.docs[S.cur].text; $("#hint").textContent = HINT[S.docs[S.cur].kind || "pseudo"]; draw(); save();
+}
+
+// ---------- parser ----------
+function parse(t) {
+  const root = [], st = [{ n: null, b: root }];
+  for (const raw of t.split("\n")) {
+    const l = raw.trim().replace(/^(\d+[.)]|step\s*\d+[:.)]?)\s*/i, ""); if (!l || l.startsWith("//") || /^(start|begin|stop|end)$/i.test(l)) continue;
+    const f = st[st.length - 1]; let m;
+    if ((m = l.match(/^if\s+(.+?)(\s+then)?$/i))) { const n = { t: "if", c: m[1], y: [], n: [] }; f.b.push(n); st.push({ n, b: n.y }); }
+    else if (/^(else|otherwise)$/i.test(l)) { if (f.n && f.n.t === "if") f.b = f.n.n; }
+    else if (/^(endif|end if|endwhile|end while|endfor|end for|next)\b/i.test(l)) { if (st.length > 1) st.pop(); }
+    else if ((m = l.match(/^(while|for)\s+(.+?)(\s+do)?$/i))) { const n = { t: "w", c: (m[1].toLowerCase() === "for" ? "for " : "") + m[2], y: [] }; f.b.push(n); st.push({ n, b: n.y }); }
+    else if ((m = l.match(/^(input|read)\s+(.+)$/i))) f.b.push({ t: "io", c: "Input " + m[2] });
+    else if ((m = l.match(/^(output|print|display)\s+(.+)$/i))) f.b.push({ t: "io", c: "Output " + m[2] });
+    else if ((m = l.match(/^set\s+(.+?)\s+to\s+(.+)$/i))) f.b.push({ t: "p", c: m[1] + " <- " + m[2] });
+    else f.b.push({ t: "p", c: l });
+  }
+  return root;
+}
+
+// ---------- convert: tree -> text in each dialect ----------
+function ser(tree, k) {
+  const P = k === "pseudo", o = []; let i = 0;
+  const line = (d, s) => o.push((k === "algo" ? ++i + ". " : "") + "  ".repeat(d) + s);
+  (function walk(b, d) {
+    for (const n of b) {
+      if (n.t === "p") { const m = n.c.match(/^(.+?)\s*(?:<-|←)\s*(.+)$/); line(d, m ? (P ? m[1] + " <- " + m[2] : "Set " + m[1] + " to " + m[2]) : n.c); }
+      else if (n.t === "io") { const inp = /^Input /.test(n.c), v = n.c.replace(/^(Input|Output) /, ""); line(d, P ? (inp ? "input " : "output ") + v : (inp ? "Read " : "Print ") + v); }
+      else if (n.t === "if") { line(d, (P ? "if " : "If ") + n.c + " then"); walk(n.y, d + 1); if (n.n.length) { line(d, P ? "else" : "Otherwise"); walk(n.n, d + 1); } line(d, P ? "endif" : "End if"); }
+      else { const f = /^for /.test(n.c); line(d, (f ? "" : P ? "while " : "While ") + n.c + (P || f ? "" : " do")); walk(n.y, d + 1); line(d, (P ? "end" : "End ") + (f ? "for" : "while")); }
+    }
+  })(tree, 0);
+  return o.join("\n");
+}
+
+// ---------- layout ----------
+const GAP = 34;
+const cut = s => (s = s.replace(/<-/g, "←"), s.length > 44 ? s.slice(0, 43) + "…" : s);
+const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const bw = (s, min) => Math.max(min, s.length * 8 + 32);
+
+function meas(b) {
+  let l = 0, r = 0, h = 0; const items = [];
+  b.forEach((n, i) => { const m = one(n); m.n = n; m.y = h; items.push(m); l = Math.max(l, m.l); r = Math.max(r, m.r); h += m.h + (i < b.length - 1 ? GAP : 0); });
+  return { l, r, h, items };
+}
+function one(n) {
+  const s = cut(n.c);
+  if (n.t === "s") return { l: 55, r: 55, h: 40, w: 110, s };
+  if (n.t === "p" || n.t === "io") { const w = bw(s, 120); return { l: w / 2, r: w / 2, h: 44, w, s }; }
+  const dw = Math.max(150, s.length * 8 + 60), dh = 76;
+  if (n.t === "if") {
+    const Y = meas(n.y), N = meas(n.n);
+    const cy = -Math.max(Y.r + 24, dw / 2 + 18), cn = Math.max(N.l + 24, dw / 2 + 18), bh = Math.max(Y.h, N.h);
+    return { l: -cy + Y.l, r: cn + N.r, h: dh + GAP + bh + GAP, dw, dh, Y, N, cy, cn, s };
+  }
+  const B = meas(n.y), L = Math.max(dw / 2, B.l) + GAP, R = Math.max(dw / 2, B.r) + GAP;
+  return { l: L, r: R, h: dh + GAP + B.h + 68, dw, dh, B, L, R, s };
+}
+
+// ---------- draw ----------
+function build() {
+  const root = parse(ed.value);
+  const M = meas([{ t: "s", c: "Start" }, ...root, { t: "s", c: "End" }]);
+  const o = [], pad = 30;
+  const pl = (p, ar) => o.push('<path class="l" d="M' + p.map(q => q.join(" ")).join("L") + '"' + (ar ? ' marker-end="url(#a)"' : "") + "/>");
+  const tx = (x, y, s, c) => o.push('<text class="' + (c || "t") + '" x="' + x + '" y="' + y + '">' + esc(s) + "</text>");
+  const dia = (x, y, m) => { const a = m.dw / 2, b = m.dh / 2; o.push('<polygon class="s" points="' + [x, y, x + a, y + b, x, y + 2 * b, x - a, y + b].join(" ") + '"/>'); tx(x, y + b, m.s); };
+  function seq(Q, x, y) {
+    Q.items.forEach((m, i) => { put(m, x, y + m.y); if (i < Q.items.length - 1) pl([[x, y + m.y + m.h], [x, y + Q.items[i + 1].y]], 1); });
+  }
+  function put(m, x, y) {
+    const t = m.n.t, cyc = y + (m.dh || 0) / 2;
+    if (t === "s") { o.push('<rect class="s hi" x="' + (x - 55) + '" y="' + y + '" width="110" height="40" rx="20"/>'); tx(x, y + 20, m.s); }
+    else if (t === "p") { o.push('<rect class="s" x="' + (x - m.w / 2) + '" y="' + y + '" width="' + m.w + '" height="44" rx="4"/>'); tx(x, y + 22, m.s); }
+    else if (t === "io") { const a = m.w / 2; o.push('<polygon class="s" points="' + [x - a + 14, y, x + a, y, x + a - 14, y + 44, x - a, y + 44].join(" ") + '"/>'); tx(x, y + 22, m.s); }
+    else if (t === "if") {
+      dia(x, y, m); const bt = y + m.dh + GAP, mY = y + m.h - 17, a = m.dw / 2;
+      pl([[x - a, cyc], [x + m.cy, cyc], [x + m.cy, bt]], 1); pl([[x + a, cyc], [x + m.cn, cyc], [x + m.cn, bt]], 1);
+      tx(x - a - 6, cyc - 8, "Yes", "r e"); tx(x + a + 6, cyc - 8, "No", "r");
+      seq(m.Y, x + m.cy, bt); seq(m.N, x + m.cn, bt);
+      pl([[x + m.cy, bt + m.Y.h], [x + m.cy, mY], [x, mY]]); pl([[x + m.cn, bt + m.N.h], [x + m.cn, mY], [x, mY]]); pl([[x, mY], [x, y + m.h]]);
+    } else {
+      dia(x, y, m); const bt = y + m.dh + GAP, yb = bt + m.B.h + 22, a = m.dw / 2, end = y + m.h;
+      pl([[x, y + m.dh], [x, bt]], 1); tx(x + 8, y + m.dh + 20, "Yes", "r s2"); seq(m.B, x, bt);
+      pl([[x, bt + m.B.h], [x, yb], [x - m.L, yb], [x - m.L, cyc], [x - a, cyc]], 1);
+      tx(x + a + 6, cyc - 8, "No", "r"); pl([[x + a, cyc], [x + m.R, cyc], [x + m.R, end], [x, end]]);
+    }
+  }
+  seq(M, pad + M.l, pad);
+  return { o: o.join(""), W: M.l + M.r + pad * 2, H: M.h + pad * 2 };
+}
+const CSS = '.s{fill:#fff;stroke:#14202B;stroke-width:2}.hi{fill:#FFE45E}.l{fill:none;stroke:#14202B;stroke-width:2}.t{fill:#14202B;font:600 14px "Bricolage Grotesque",system-ui,sans-serif;text-anchor:middle;dominant-baseline:central}.r{fill:#E5383B;font:700 13px "Bricolage Grotesque",system-ui,sans-serif}.e{text-anchor:end}';
+function svgStr(z) {
+  const c = build(), w = Math.round(c.W * z), h = Math.round(c.H * z);
+  return { w, h, str: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + c.W + " " + c.H + '" width="' + w + '" height="' + h + '"><style>' + CSS + '</style><defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#14202B"/></marker></defs>' + c.o + "</svg>" };
+}
+let tab = "chart";
+function draw() {
+  const k = tab === "chart" ? null : tab;
+  $("#chart").hidden = !!k; $("#txtv").hidden = !k;
+  if (k) $("#txtv").textContent = ser(parse(ed.value), k) || "(empty)";
+  else $("#chart").innerHTML = svgStr(zoom).str;
+  document.querySelectorAll(".tab").forEach(b => b.classList.toggle("on", b.dataset.t === tab));
+}
+document.querySelectorAll(".tab").forEach(b => b.onclick = () => { tab = b.dataset.t; draw(); });
+
+// ---------- export ----------
+const fname = () => S.docs[S.cur].name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "flowchart";
+function dl(blob, name) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); toast("Exported " + name); }
+const exSvg = () => dl(new Blob([svgStr(1).str], { type: "image/svg+xml" }), fname() + ".svg");
+const exTxt = () => dl(new Blob([tab === "chart" ? ed.value : ser(parse(ed.value), tab)], { type: "text/plain" }), fname() + ".txt");
+function exPng() {
+  const s = svgStr(1), img = new Image();
+  img.onload = () => { const c = document.createElement("canvas"); c.width = s.w * 2; c.height = s.h * 2; const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height); c.toBlob(b => dl(b, fname() + ".png")); };
+  img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(s.str);
+}
+
+// ---------- actions ----------
+function newDoc(name, text, kind) { S.docs.push({ name, text, kind: kind || "pseudo" }); S.cur = S.docs.length - 1; refresh(); }
+function addNew() { const n = prompt("Name this chart", "Untitled"); if (n !== null) newDoc(n.trim() || "Untitled", "", $("#kind").value); }
+function zm(d) { zoom = Math.min(2, Math.max(.4, +(zoom + d).toFixed(2))); draw(); }
+ed.addEventListener("input", () => { S.docs[S.cur].text = ed.value; draw(); clearTimeout(timer); timer = setTimeout(save, 300); });
+ed.addEventListener("keydown", e => { if (e.key === "Tab") { e.preventDefault(); document.execCommand("insertText", false, "  "); } });
+$("#docs").onchange = e => { S.cur = +e.target.value; refresh(); };
+$("#ex").onchange = e => { if (e.target.value) newDoc(e.target.value, EX[e.target.value], EXK[e.target.value]); e.target.value = ""; };
+$("#new").onclick = addNew;
+$("#conv").onchange = e => {
+  const k = e.target.value; e.target.value = ""; if (!k) return;
+  newDoc(S.docs[S.cur].name, ser(parse(ed.value), k), k); toast("Converted to " + KN[k]);
+};
+$("#del").onclick = () => {
+  if (!confirm("Delete \"" + S.docs[S.cur].name + "\"?")) return;
+  if (S.docs.length > 1) { S.docs.splice(S.cur, 1); S.cur = Math.max(0, S.cur - 1); } else S.docs[0].text = "";
+  refresh();
+};
+$("#png").onclick = exPng; $("#svg").onclick = exSvg; $("#txt").onclick = exTxt;
+$("#zi").onclick = () => zm(.2); $("#zo").onclick = () => zm(-.2);
+$("#help").onclick = () => $("#dlg").showModal(); $("#close").onclick = () => $("#dlg").close();
+
+document.addEventListener("keydown", e => {
+  const k = e.key.toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && k === "s") { e.preventDefault(); save(); toast("Saved"); }
+  else if (e.altKey && k === "n") { e.preventDefault(); addNew(); }
+  else if (e.altKey && k === "p") { e.preventDefault(); exPng(); }
+  else if (e.altKey && k === "v") { e.preventDefault(); exSvg(); }
+  else if (e.altKey && k === "t") { e.preventDefault(); exTxt(); }
+  else if (e.altKey && (k === "=" || k === "+")) { e.preventDefault(); zm(.2); }
+  else if (e.altKey && (k === "-" || k === "−")) { e.preventDefault(); zm(-.2); }
+  else if (e.altKey && k === "/") { e.preventDefault(); $("#dlg").showModal(); }
+});
+
+refresh();
+</script>
+</body>
+</html>
